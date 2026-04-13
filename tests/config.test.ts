@@ -6,8 +6,9 @@ vi.mock('node:fs/promises', () => ({
 }));
 
 describe('parseConfig', () => {
-  it('applies all defaults for an empty object', () => {
-    expect(parseConfig({})).toEqual({
+  it('applies all defaults when only instance_id is provided', () => {
+    expect(parseConfig({ instance_id: 'default' })).toEqual({
+      instance_id: 'default',
       model: 'anthropic/claude-sonnet-4-5',
       guidelines: '.github/carl.md',
       max_diff_chars: 20000,
@@ -16,14 +17,29 @@ describe('parseConfig', () => {
     });
   });
 
+  it('throws ConfigError when instance_id is missing', () => {
+    expect(() => parseConfig({})).toThrow(ConfigError);
+  });
+
+  it('throws ConfigError when instance_id is empty string', () => {
+    expect(() => parseConfig({ instance_id: '' })).toThrow(ConfigError);
+  });
+
+  it('throws ConfigError when instance_id contains invalid characters', () => {
+    expect(() => parseConfig({ instance_id: 'my instance' })).toThrow(ConfigError);
+    expect(() => parseConfig({ instance_id: 'my-->id' })).toThrow(ConfigError);
+  });
+
   it('accepts a fully specified config', () => {
     const result = parseConfig({
+      instance_id: 'backend',
       model: 'openai/gpt-4o',
       guidelines: '.github/review.md',
       max_diff_chars: 5000,
       max_files: 5,
       ignore: ['*.lock', 'dist/**'],
     });
+    expect(result.instance_id).toBe('backend');
     expect(result.model).toBe('openai/gpt-4o');
     expect(result.guidelines).toBe('.github/review.md');
     expect(result.max_diff_chars).toBe(5000);
@@ -73,19 +89,22 @@ describe('loadConfig', () => {
 
   it('loads a valid YAML config and reads the guidelines file', async () => {
     readFileMock
-      .mockResolvedValueOnce('model: openai/gpt-4o\nmax_files: 5' as unknown as Buffer)
+      .mockResolvedValueOnce(
+        'instance_id: backend\nmodel: openai/gpt-4o\nmax_files: 5' as unknown as Buffer,
+      )
       .mockResolvedValueOnce('Review the code carefully.' as unknown as Buffer);
 
     const result = await loadConfig('.github/carl.yml');
 
+    expect(result.config.instance_id).toBe('backend');
     expect(result.config.model).toBe('openai/gpt-4o');
     expect(result.config.max_files).toBe(5);
     expect(result.guidelinesContent).toBe('Review the code carefully.');
   });
 
-  it('applies defaults when YAML file is empty', async () => {
+  it('applies defaults when YAML file is empty (except required instance_id)', async () => {
     readFileMock
-      .mockResolvedValueOnce('' as unknown as Buffer)
+      .mockResolvedValueOnce('instance_id: default' as unknown as Buffer)
       .mockResolvedValueOnce('Guidelines here' as unknown as Buffer);
 
     const result = await loadConfig('.github/carl.yml');

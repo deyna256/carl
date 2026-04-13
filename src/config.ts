@@ -10,6 +10,7 @@ export class ConfigError extends Error {
 }
 
 export interface CarlConfig {
+  readonly instance_id: string;
   readonly model: string;
   readonly guidelines: string;
   readonly max_diff_chars: number;
@@ -30,12 +31,24 @@ const DEFAULTS = {
   ignore: [] as readonly string[],
 } as const;
 
+const INSTANCE_ID_RE = /^[a-zA-Z0-9_-]+$/;
+
 export function parseConfig(raw: unknown): CarlConfig {
   if (typeof raw !== 'object' || raw === null) {
     throw new ConfigError('carl.yml must be a YAML mapping');
   }
 
   const r = raw as Record<string, unknown>;
+
+  const instance_id = r['instance_id'];
+  if (typeof instance_id !== 'string' || instance_id.trim().length === 0) {
+    throw new ConfigError('`instance_id` is required and must be a non-empty string');
+  }
+  if (!INSTANCE_ID_RE.test(instance_id)) {
+    throw new ConfigError(
+      '`instance_id` may only contain letters, digits, hyphens, and underscores',
+    );
+  }
 
   const model = r['model'] !== undefined ? r['model'] : DEFAULTS.model;
   if (typeof model !== 'string' || model.trim().length === 0) {
@@ -67,7 +80,7 @@ export function parseConfig(raw: unknown): CarlConfig {
     throw new ConfigError('`ignore` must be an array of strings');
   }
 
-  return { model, guidelines, max_diff_chars, max_files, ignore };
+  return { instance_id, model, guidelines, max_diff_chars, max_files, ignore };
 }
 
 export async function loadConfig(configPath: string): Promise<LoadedConfig> {

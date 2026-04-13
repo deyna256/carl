@@ -10,12 +10,14 @@ export interface PostCommentOptions {
   readonly body: string;
 }
 
-const CARL_MARKER = '<!-- carl:review -->';
+export function buildCarlMarker(instanceId: string): string {
+  return `<!-- carl:review instance=${instanceId} -->`;
+}
 
 export async function deletePreviousCarlComments(
-  options: Omit<PostCommentOptions, 'body'>,
+  options: Omit<PostCommentOptions, 'body'> & { readonly instanceId: string },
 ): Promise<void> {
-  const { octokit, owner, repo, pullNumber } = options;
+  const { octokit, owner, repo, pullNumber, instanceId } = options;
 
   const { data: comments } = await octokit.rest.issues.listComments({
     owner,
@@ -24,7 +26,8 @@ export async function deletePreviousCarlComments(
     per_page: 100,
   });
 
-  const carlComments = comments.filter((c) => c.body?.includes(CARL_MARKER));
+  const marker = buildCarlMarker(instanceId);
+  const carlComments = comments.filter((c) => c.body?.includes(marker));
 
   await Promise.all(
     carlComments.map((c) =>

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
+  buildCarlMarker,
   deletePreviousCarlComments,
   postReviewComment,
   buildFallbackComment,
@@ -17,10 +18,16 @@ function makeMockOctokit(existingComments: Array<{ id: number; body: string }> =
   };
 }
 
+describe('buildCarlMarker', () => {
+  it('embeds the instance id in the marker', () => {
+    expect(buildCarlMarker('backend')).toBe('<!-- carl:review instance=backend -->');
+  });
+});
+
 describe('deletePreviousCarlComments', () => {
-  it('deletes comments that contain the carl marker', async () => {
+  it('deletes comments that contain the matching instance marker', async () => {
     const octokit = makeMockOctokit([
-      { id: 10, body: '<!-- carl:review -->\n### carl review\n\nOld review' },
+      { id: 10, body: '<!-- carl:review instance=backend -->\n### carl review\n\nOld review' },
       { id: 11, body: 'Some unrelated comment' },
     ]);
 
@@ -29,6 +36,7 @@ describe('deletePreviousCarlComments', () => {
       owner: 'o',
       repo: 'r',
       pullNumber: 1,
+      instanceId: 'backend',
     });
 
     expect(octokit.rest.issues.deleteComment).toHaveBeenCalledOnce();
@@ -39,10 +47,10 @@ describe('deletePreviousCarlComments', () => {
     });
   });
 
-  it('deletes multiple carl comments', async () => {
+  it('deletes multiple carl comments for the same instance', async () => {
     const octokit = makeMockOctokit([
-      { id: 10, body: '<!-- carl:review -->\n### carl review\n\nFirst' },
-      { id: 11, body: '<!-- carl:review -->\n### carl review\n\nSecond' },
+      { id: 10, body: '<!-- carl:review instance=backend -->\n### carl review\n\nFirst' },
+      { id: 11, body: '<!-- carl:review instance=backend -->\n### carl review\n\nSecond' },
     ]);
 
     await deletePreviousCarlComments({
@@ -50,12 +58,32 @@ describe('deletePreviousCarlComments', () => {
       owner: 'o',
       repo: 'r',
       pullNumber: 1,
+      instanceId: 'backend',
     });
 
     expect(octokit.rest.issues.deleteComment).toHaveBeenCalledTimes(2);
   });
 
-  it('does not delete comments without the carl marker', async () => {
+  it('does not delete comments from a different instance', async () => {
+    const octokit = makeMockOctokit([
+      {
+        id: 10,
+        body: '<!-- carl:review instance=frontend -->\n### carl review\n\nFrontend review',
+      },
+    ]);
+
+    await deletePreviousCarlComments({
+      octokit: octokit as never,
+      owner: 'o',
+      repo: 'r',
+      pullNumber: 1,
+      instanceId: 'backend',
+    });
+
+    expect(octokit.rest.issues.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('does not delete comments without a carl marker', async () => {
     const octokit = makeMockOctokit([
       { id: 10, body: '### carl review\n\nNo marker, legacy comment' },
       { id: 11, body: 'Unrelated comment' },
@@ -66,6 +94,7 @@ describe('deletePreviousCarlComments', () => {
       owner: 'o',
       repo: 'r',
       pullNumber: 1,
+      instanceId: 'backend',
     });
 
     expect(octokit.rest.issues.deleteComment).not.toHaveBeenCalled();

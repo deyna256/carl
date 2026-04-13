@@ -3,7 +3,12 @@ import * as github from '@actions/github';
 import { loadConfig, ConfigError } from './config';
 import { getFilteredDiff, fetchLinkedIssues, DiffError } from './diff';
 import { buildPrompt, callOpenRouter, AiError, type PrContext } from './ai';
-import { deletePreviousCarlComments, postReviewComment, buildFallbackComment } from './comment';
+import {
+  buildCarlMarker,
+  deletePreviousCarlComments,
+  postReviewComment,
+  buildFallbackComment,
+} from './comment';
 
 async function run(): Promise<void> {
   const apiKey = core.getInput('openrouter-api-key', { required: true });
@@ -65,13 +70,19 @@ async function run(): Promise<void> {
       );
     }
 
-    await deletePreviousCarlComments({ octokit, owner, repo, pullNumber });
+    await deletePreviousCarlComments({
+      octokit,
+      owner,
+      repo,
+      pullNumber,
+      instanceId: config.instance_id,
+    });
     await postReviewComment({
       octokit,
       owner,
       repo,
       pullNumber,
-      body: `<!-- carl:review -->\n### carl review\n\n${review}`,
+      body: `${buildCarlMarker(config.instance_id)}\n### carl review\n\n${review}`,
     });
 
     core.info('Review posted successfully');
