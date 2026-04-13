@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { deletePreviousCarlComments, postReviewComment, buildFallbackComment } from '../src/comment';
+import {
+  deletePreviousCarlComments,
+  postReviewComment,
+  buildFallbackComment,
+} from '../src/comment';
 
 function makeMockOctokit(existingComments: Array<{ id: number; body: string }> = []) {
   return {
