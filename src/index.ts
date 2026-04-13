@@ -3,7 +3,7 @@ import * as github from '@actions/github';
 import { loadConfig, ConfigError } from './config';
 import { getFilteredDiff, fetchLinkedIssues, DiffError } from './diff';
 import { buildPrompt, callOpenRouter, AiError, type PrContext } from './ai';
-import { postReviewComment, buildFallbackComment } from './comment';
+import { deletePreviousCarlComments, postReviewComment, buildFallbackComment } from './comment';
 
 async function run(): Promise<void> {
   const apiKey = core.getInput('openrouter-api-key', { required: true });
@@ -65,12 +65,13 @@ async function run(): Promise<void> {
       );
     }
 
+    await deletePreviousCarlComments({ octokit, owner, repo, pullNumber });
     await postReviewComment({
       octokit,
       owner,
       repo,
       pullNumber,
-      body: `### carl review\n\n${review}`,
+      body: `<!-- carl:review -->\n### carl review\n\n${review}`,
     });
 
     core.info('Review posted successfully');
